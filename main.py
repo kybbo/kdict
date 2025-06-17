@@ -1,35 +1,42 @@
-import requests, sys, lxml
+import requests, sys
 from bs4 import BeautifulSoup
 from rich import print
 
 def curl_merriam_webster():
-    # scraps html from given word out of merriam-webster.com
     kdict_input = sys.argv[1]
-    curl_output = requests.get("https://www.merriam-webster.com/dictionary/"+kdict_input)
-
-    return curl_output.text
+    try:
+        response = requests.get(f"https://www.merriam-webster.com/dictionary/{kdict_input}", timeout=5)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"couldn't reach merriam-webster")
+        sys.exit(1)
+    return response.text
 
 def scrap_curl(curl_output: str):
-    # refactors mega string to get only desired html
     soup = BeautifulSoup(curl_output, "lxml")
-    #chosen_div = soup.find(id="dictionary-entry-1")
+
     title = soup.select_one("#dictionary-entry-1 .row.entry-header .col-12 .entry-header-content .hword")
     word_type = soup.select_one("#dictionary-entry-1 .row.entry-header .col-12 .entry-header-content .parts-of-speech .important-blue-link")
     definition = soup.select_one("#dictionary-entry-1 .vg .vg-sseq-entry-item .sb .sb-0 .sense .dt .dtText")
 
-    key_words = [title.text, word_type.text, definition.text]
+    if not title or not word_type or not definition:
+        print("not a word (probably)")
+        sys.exit(1)
 
-
-    return key_words
+    return [title.text.strip(), word_type.text.strip(), definition.text.strip()]
 
 def enrich_output(key_words):
-    key_words = scrap_curl(curl_merriam_webster())
-
-    print(f"[bold]{key_words[0]}[bold] [italic]{key_words[1]}[italic]")
+    print(f"[bold]{key_words[0]}[/bold] [italic]{key_words[1]}[/italic]")
     print(key_words[2])
 
 def main():
-    enrich_output(scrap_curl(curl_merriam_webster()))
+    try:
+        html = curl_merriam_webster()
+        key_words = scrap_curl(html)
+        enrich_output(key_words)
+    except Exception as e:
+        print(f"[red]❌ Error inesperado: {e}[/red]")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
